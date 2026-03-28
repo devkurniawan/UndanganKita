@@ -1,0 +1,9 @@
+{
+  "name": "UndanganKita - Layanan Undangan Online",
+  "description": "Platform pembuatan undangan digital interaktif dengan fitur RSVP, Galeri, dan Pembayaran Otomatis.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

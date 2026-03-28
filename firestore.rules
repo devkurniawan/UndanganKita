@@ -1,0 +1,128 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields: uid, email, displayName, photoURL, createdAt
+    //
+    // Collection: invitations
+    // Fields: userId, slug, templateId, status, data, createdAt, updatedAt
+    //
+    // Collection: rsvp
+    // Fields: invitationId, name, attendance, guestCount, message, createdAt
+    //
+    // Collection: guestbook
+    // Fields: invitationId, name, message, createdAt
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "dev.kurniawan.e@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'createdAt', 'role']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.email is string && isValidEmail(data.email);
+    }
+
+    function isValidInvitation(data) {
+      // Relaxed requirements for debugging and uniqueness check
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.slug is string && data.slug.size() >= 3 &&
+             data.status in ['draft', 'pending', 'active', 'expired'];
+    }
+
+    function isValidRSVP(data) {
+      return hasRequiredFields(['invitationId', 'name', 'attendance']) &&
+             data.invitationId is string && data.name is string && data.name.size() > 0 &&
+             data.attendance is bool;
+    }
+
+    function isValidGuestbook(data) {
+      return hasRequiredFields(['invitationId', 'name', 'message']) &&
+             data.invitationId is string && data.name is string && data.name.size() > 0 &&
+             data.message is string && data.message.size() > 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isValidUser(request.resource.data);
+    }
+
+    match /invitations/{invitationId} {
+      // Allow authenticated users to read for uniqueness check and public viewing
+      allow read: if isAuthenticated();
+      
+      // Only owner can create/update
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidInvitation(request.resource.data);
+      allow update: if isDocOwner() && isValidInvitation(request.resource.data) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isDocOwner();
+    }
+
+    match /rsvp/{rsvpId} {
+      // Owner can read all RSVP for their invitation
+      allow read: if isAuthenticated() && exists(/databases/$(database)/documents/invitations/$(resource.data.invitationId)) &&
+                     get(/databases/$(database)/documents/invitations/$(resource.data.invitationId)).data.userId == request.auth.uid;
+      
+      // Public can create if invitation is active
+      allow create: if isValidRSVP(request.resource.data) && 
+                      get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.status == 'active';
+    }
+
+    match /guestbook/{guestbookId} {
+      // Public can read all guestbook entries for an invitation if it's active
+      allow read: if get(/databases/$(database)/documents/invitations/$(resource.data.invitationId)).data.status == 'active' || 
+                     (isAuthenticated() && get(/databases/$(database)/documents/invitations/$(resource.data.invitationId)).data.userId == request.auth.uid);
+      
+      // Public can create if invitation is active
+      allow create: if isValidGuestbook(request.resource.data) && 
+                      get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.status == 'active';
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Invitation": {
+      "title": "Invitation",
+      "description": "Wedding or event invitation data",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "slug": { "type": "string" },
+        "templateId": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "pending", "active", "expired"] },
+        "data": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "date": { "type": "string", "format": "date-time" },
+            "location": { "type": "string" },
+            "mapsUrl": { "type": "string", "format": "uri" },
+            "description": { "type": "string" },
+            "gallery": { "type": "array", "items": { "type": "string", "format": "uri" } },
+            "musicUrl": { "type": "string", "format": "uri" },
+            "story": { "type": "array", "items": { "type": "object", "properties": { "year": { "type": "string" }, "content": { "type": "string" } } } }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "slug", "status"]
+    },
+    "RSVP": {
+      "title": "RSVP",
+      "description": "Guest RSVP response",
+      "type": "object",
+      "properties": {
+        "invitationId": { "type": "string" },
+        "name": { "type": "string" },
+        "attendance": { "type": "boolean" },
+        "guestCount": { "type": "integer" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["invitationId", "name", "attendance"]
+    },
+    "Guestbook": {
+      "title": "Guestbook",
+      "description": "Guest messages and wishes",
+      "type": "object",
+      "properties": {
+        "invitationId": { "type": "string" },
+        "name": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["invitationId", "name", "message"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "User", "description": "User profiles" },
+    "/invitations/{invitationId}": { "schema": "Invitation", "description": "Invitations created by users" },
+    "/rsvp/{rsvpId}": { "schema": "RSVP", "description": "RSVP responses for invitations" },
+    "/guestbook/{guestbookId}": { "schema": "Guestbook", "description": "Guestbook entries for invitations" }
+  }
+}
